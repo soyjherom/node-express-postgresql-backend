@@ -1,38 +1,43 @@
-const fakerJs = require('@faker-js/faker');
 const boom = require('@hapi/boom');
 const { v4 } = require('uuid');
 const uuidv4 = v4;
 
-const { client } = require('../libs/postgres');
+const { pool } = require('../libs/postgres');
 
 class ProductServices {
 
   constructor() {
-    this.products = this.generate(100)
+    this.pool = pool;
+    this.pool.on('error', (err)=>{
+      throw boom.serverUnavailable(err.message);
+    });
   }
 
-  generate (size) {
-    const limit = size ? size : 100
-    const fakedProducts = [];
-    for(let i = 0; i < parseInt(limit); i++){
-      fakedProducts.push({
-        id: uuidv4(),
-        name: fakerJs.faker.commerce.product(),
-        price: parseInt(fakerJs.faker.commerce.price(), 10),
-        image: fakerJs.faker.image.imageUrl(),
-        isBlocked: fakerJs.faker.datatype.boolean(),
-      });
-    }
-    return fakedProducts;
+  async exists(id) {
+    return new Promise((resolve, reject) =>{
+      try{
+        const query = `SELECT 1 FROM products WHERE id = '${id}'`;
+        this.pool.query(query, (err, res)=>{
+          if(err) reject(err);
+          if(res.rows.length <= 0) reject(boom.notFound('Product Not Found!'));
+          resolve('OK');
+        })
+      }
+      catch(e){
+        reject(e);
+      }
+    });
   }
 
   async create (product) {
     return new Promise((resolve, reject) => {
       try{
-        setTimeout(()=>{
-          this.products.push(product);
-          resolve(this.findOne(product.id));
-        },1000);
+        const query = 'INSERT INTO products (id, category_id, product_name, price)';
+        const values = ` VALUES ('${uuidv4()}', ${product.category_id}, '${product.product_name}', ${product.price});`
+        this.pool.query(query + values, (err)=>{
+          if(err) reject(err);
+          resolve('OK');
+        })
       }catch(e){
         reject(e);
       }
@@ -42,12 +47,11 @@ class ProductServices {
   async find (size) {
     return new Promise((resolve, reject)=>{
       try{
-        client.connect().catch((e)=>console.error(e.message));
-        client.query(`SELECT * FROM products LIMIT ${size};`,
-        (error, response)=>{
-          if(error) throw error;
-          resolve(response.rows)
-        });
+        const query = `SELECT * FROM products LIMIT ${size};`;
+        this.pool.query(query,(err, results)=>{
+          if(err) reject(err);
+          resolve(results.rows);
+        })
       }catch(e){
         reject(e)
       }
@@ -57,16 +61,12 @@ class ProductServices {
   async findOne (id) {
     return new Promise((resolve, reject)=>{
       try{
-        setTimeout(()=>{
-          const result = this.products.filter(p => {
-            if(id === p.id) return p;
-          })
-          if(result.length===0)
-            reject(boom.notFound('Product not found'));
-          else if(result[0].isBlocked)
-            reject(boom.conflict("The product is blocked"));
-          else resolve(result[0]);
-        },1000);
+        this.exists(id).catch(e=>reject(e));
+        const query = `SELECT * FROM products WHERE id = '${id}';`;
+        this.pool.query(query,(err, results)=>{
+          if(err) reject(err);
+          resolve(results.rows[0]);
+        })
       }catch(e){
         reject(e);
       }
@@ -76,20 +76,18 @@ class ProductServices {
   async update (product) {
     return new Promise((resolve, reject)=>{
       try{
-        setTimeout(()=>{
-          const index = this.products.findIndex(p=>p.id===product.id);
-          if(index < 0) reject(boom.notFound('Product not found'));
-          this.products.map(p=>{
-            if(p.id === product.id){
-              p.name = product.name ? product.name : p.name;
-              p.price = product.price ? product.price : p.price;
-              p.image = product.image ? product.image : p.image;
-            }
-          })
-          resolve(this.products.filter(p=>{
-            if(p.id === product.id) return p;
-          }));
-        },1000);
+        this.exists(product.id).catch(e=>reject(e));
+        let updateQuery = 'UPDATE products SET';
+        if(product.product_name) updateQuery += ` product_name = '${product.product_name},'`;
+        if(product.category_id) updateQuery += ` category_id = ${product.category_id},`;
+        if(product.price) updateQuery += ` price = ${product.price},`;
+        if(product.is_active) updateQuery += ` is_active = ${product.is_active},`;
+        updateQuery += ` updated_on = now() WHERE id = '${product.id}';`
+        this.pool.query(updateQuery, (err)=>{
+          if(err) reject(err);
+          resolve('OK');
+        })
+
       }catch(e){
         reject(e)
       }
@@ -99,12 +97,12 @@ class ProductServices {
   async delete (id) {
     return new Promise((resolve, reject)=>{
       try{
-        setTimeout(()=>{
-          const index = this.products.findIndex(p=>p.id===id);
-          if(index < 0) reject(boom.notFound('Product not found'));
-          this.products = this.products.splice(index, 1);
-          resolve('Product deleted successfully');
-        },1000);
+        this.exists(id).catch(e=>reject(e));
+        const query = `DELETE FROM products WHERE id = '${id}';`;
+        this.pool.query(query, (err)=>{
+          if(err) reject(err);
+          resolve('OK');
+        })
       }catch(e){
         reject(e)
       }

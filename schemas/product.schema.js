@@ -4,22 +4,22 @@ const Joi = require('joi');
 const idRule = Joi.string().uuid();
 const nameRule = Joi.string().min(3).max(15);
 const priceRule = Joi.number().integer().min(10);
-const imageRule = Joi.string().uri();
+const categoryRule = Joi.number();
 
 const idRequiredProductSchema = Joi.object({
   id: idRule.required()
 });
 
 const createProductSchema = Joi.object({
-  name: nameRule.required(),
+  product_name: nameRule.required(),
   price: priceRule.required(),
-  image: imageRule
+  category_id: categoryRule.required()
 });
 
 const updateProductSchema = Joi.object({
   name: nameRule,
   price: priceRule,
-  image: imageRule
+  category_id: categoryRule
 });
 
 module.exports = {
