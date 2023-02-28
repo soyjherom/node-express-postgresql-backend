@@ -3,7 +3,7 @@ const boom = require('@hapi/boom');
 const { v4 } = require('uuid');
 const uuidv4 = v4;
 
-const { getConnection } = require('../libs/postgres');
+const { client } = require('../libs/postgres');
 
 class ProductServices {
 
@@ -40,31 +40,14 @@ class ProductServices {
   }
 
   async find (size) {
-    const client = await getConnection();
-    const response = client.query('SELECT * FROM products');
-    const results =  [];
-    let i = 0;
-    response.rows.forEach(row => {
-      if(i<size) results.push(row);
-      else return;
-      i++;
-    });
-    return results;
-  }
-
-  async promiseFind (size) {
     return new Promise((resolve, reject)=>{
       try{
-        const client = getConnection();
-        const response = client.query('SELECT * FROM products');
-        const results =  [];
-        let i = 0;
-        response.rows.forEach(row => {
-          if(i<size) results.push(row);
-          else return;
-          i++;
+        client.connect().catch((e)=>console.error(e.message));
+        client.query(`SELECT * FROM products LIMIT ${size};`,
+        (error, response)=>{
+          if(error) throw error;
+          resolve(response.rows)
         });
-        resolve(results);
       }catch(e){
         reject(e)
       }
