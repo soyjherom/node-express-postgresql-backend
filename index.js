@@ -8,6 +8,11 @@ const { boomErrorHandler, errorHandler, logErrors } = require('./middleWares/err
 const app = express();
 const port = process.env.PORT || 3021;
 
+process.on('uncaughtException', function (err) {
+  console.log(err);
+});
+
+
 app.use(express.json())
 
 const whitelist = ['http://localhost:8083', 'https://myapp.co']

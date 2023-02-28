@@ -3,6 +3,8 @@ const boom = require('@hapi/boom');
 const { v4 } = require('uuid');
 const uuidv4 = v4;
 
+const { client } = require('../libs/postgres');
+
 class ProductServices {
 
   constructor() {
@@ -40,17 +42,12 @@ class ProductServices {
   async find (size) {
     return new Promise((resolve, reject)=>{
       try{
-        setTimeout(()=>{
-          let counter = 0
-          const limit = size ? parseInt(size) : 100
-          const results = this.products.filter(p=>{
-            if(counter < limit) {
-              counter++;
-              return p;
-            }
-          });
-          resolve(results);
-        },2000);
+        client.connect().catch((e)=>console.error(e.message));
+        client.query(`SELECT * FROM products LIMIT ${size};`,
+        (error, response)=>{
+          if(error) throw error;
+          resolve(response.rows)
+        });
       }catch(e){
         reject(e)
       }
